@@ -2,7 +2,6 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
-#include <ctime>
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -11,7 +10,6 @@
 
 int LEVEL_WIDTH = 2560;
 int LEVEL_HEIGHT = 1440;
-
 
 int SCREEN_WIDTH = 1280;
 int SCREEN_HEIGHT = 720;
@@ -22,16 +20,13 @@ SDL_Renderer* renderer = NULL;
 
 SDL_Rect camera = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
 
+const int TOTAL_PARTICLES = 20;//PDQuan 25/4
+SDL_Rect bloodParticleSprite[0];
+
 int SLIME_SPRITE_COUNT = 11;
 SDL_Rect slimeSprite[11];
 
-int SNAKE_SPRITE_COUNT = 2;
-SDL_Rect snakeSprite[2];
-
-int HEART_SPRITE_COUNT = 5;
-SDL_Rect heartSprite[5];
-
-int COIN_SPRITE_COUNT = 6;
+int COIN_SPRITE_COIN = 6;
 SDL_Rect coinSprite[6];
 
 SDL_Rect spriteWalkdown[11];
@@ -47,14 +42,7 @@ enum dir
     right
 };
 
-enum enemyType
-{
-    SLIME,
-    SNAKE,
-    ENEMY_TYPES
-};
-
-enum atkdir
+enum atkdir //pdq t3
 {
     _up,
     upleft,
@@ -66,7 +54,7 @@ enum atkdir
     upright
 };
 
-enum weapon
+enum weapon //pdq t3
 {
     sword,
     bow
@@ -80,9 +68,8 @@ class Object;
 class Player;
 class Boss;
 class projectile;
-class Slime;
+class Enemy;
 class coin;
-class Snake;
 
 //vector arrays
 std::vector<Object*> objects;
@@ -94,105 +81,106 @@ bool loadAsset();
 void quit();
 bool checkCollision(SDL_Rect a, SDL_Rect b);
 bool checkCollisionObj (SDL_Rect a, std::vector<Object*> objs);
-bool checkCollisionEnemy (SDL_Rect a, std::vector<Slime*> enemies);
+bool checkCollisionEnemy (SDL_Rect a, std::vector<Enemy*> enemies);
 float angleBetween(Object& a, Object& b);
 float angleBetweenRect(SDL_Rect a, SDL_Rect b);
 float distanceBetween(Object& a, Object& b);
 float distanceBetweenRect(SDL_Rect a, SDL_Rect b);
 void checkAlive();
-void spawnEnemy(int& time);
 
 //class implementation
 class Texture//following from lazyfoo tutorial^^
 {
-    public:
-        Texture(int x = 0, int y = 0)
-        {
-            dTexture = NULL;
-            tWidth = 0;
-            tHeight = 0;
-        }
+public:
+    Texture(int x = 0, int y = 0)
+    {
+        dTexture = NULL;
+        tWidth = 0;
+        tHeight = 0;
+    }
 
-        ~Texture()
-        {
-            free();
-        }
+    ~Texture()
+    {
+        free();
+    }
 
-        void render(int x = 0, int y = 0, SDL_Rect* clip = NULL, double angle = 0.0, SDL_Point* center = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE )
+    void render(int x = 0, int y = 0, SDL_Rect* clip = NULL, double angle = 0.0, SDL_Point* center = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE )
+    {
+        SDL_Rect rect = {x, y, tWidth, tHeight};
+        //SDL_Rect sized_rect = {x, y, 240*2, 208*2};
+        if (clip != NULL)
         {
-            SDL_Rect rect = {x, y, tWidth, tHeight};
-            //SDL_Rect sized_rect = {x, y, 240*2, 208*2};
-            if (clip != NULL)
-            {
-                rect.w = clip->w;
-                rect.h = clip->h;
-            }
-            SDL_RenderCopyEx(renderer, dTexture, clip, &rect, angle, center, flip);
+            rect.w = clip->w;
+            rect.h = clip->h;
         }
+        SDL_RenderCopyEx(renderer, dTexture, clip, &rect, angle, center, flip);
+    }
 
-        bool loadFile(std::string path)
+    bool loadFile(std::string path)
+    {
+        free();
+        SDL_Texture* convertedtexture = NULL;
+        SDL_Surface* loadedsurface = IMG_Load(path.c_str());
+        //dTexture = IMG_LoadTexture(path.c_str());
+        if (loadedsurface == NULL)
+            std::cout << "loadFile Error: can't load surface" << std::endl;
+        else
         {
-            free();
-            SDL_Texture* convertedtexture = NULL;
-            SDL_Surface* loadedsurface = IMG_Load(path.c_str());
-            //dTexture = IMG_LoadTexture(path.c_str());
-            if (loadedsurface == NULL)
-                std::cout << "loadFile Error: can't load surface" << std::endl;
+            convertedtexture = SDL_CreateTextureFromSurface(renderer, loadedsurface);
+            if (convertedtexture == NULL)
+                std::cout << "loadFile Error: can't convert surface" << std::endl;
             else
             {
-                convertedtexture = SDL_CreateTextureFromSurface(renderer, loadedsurface);
-                if (convertedtexture == NULL)
-                    std::cout << "loadFile Error: can't convert surface" << std::endl;
-                else
-                {
-                    tWidth = loadedsurface->w;
-                    tHeight = loadedsurface->h;
+                tWidth = loadedsurface->w;
+                tHeight = loadedsurface->h;
 
-                }
-                SDL_FreeSurface(loadedsurface);
             }
-            dTexture = convertedtexture;
-            //SDL_DestroyTexture(convertedtexture);
-            if (dTexture == NULL)
-                return false;
-            else
-                return true;
+            SDL_FreeSurface(loadedsurface);
         }
+        dTexture = convertedtexture;
+        //SDL_DestroyTexture(convertedtexture);
+        if (dTexture == NULL)
+            return false;
+        else
+            return true;
+    }
 
-        void free()
-        {
-            SDL_DestroyTexture(dTexture);
-            dTexture = NULL;
-            tWidth = 0;
-            tHeight = 0;
-        }
+    void free()
+    {
+        SDL_DestroyTexture(dTexture);
+        dTexture = NULL;
+        tWidth = 0;
+        tHeight = 0;
+    }
 
-        int getWidth()
-        {
-            return tWidth;
-        }
+    int getWidth()
+    {
+        return tWidth;
+    }
 
-        int getHeight()
-        {
-            return tHeight;
-        }
+    int getHeight()
+    {
+        return tHeight;
+    }
+    SDL_Texture* getTexture()
+    {
+        return dTexture;
+    }
 
-    private:
-        int tWidth;
-        int tHeight;
+private:
+    int tWidth;
+    int tHeight;
 
-        SDL_Texture* dTexture;
+    SDL_Texture* dTexture;
 };
 
 //sprites
-//Texture dumb;
 Texture link;
 Texture background;
-Texture arrow;
+Texture dumb;
 Texture slime;
 Texture Coin;
-Texture Heart;
-Texture snake;
+Texture arrow; //pqd t3
 
 class Object
 {
@@ -283,7 +271,175 @@ protected:
     SDL_Rect cbox;
     Texture* txtr;
 };
+//class Particle//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//{
+//	public:
+//        Particle( int x, int y/*, float angle = 0*/ )
+//        {
+//            //Set offsets
+//            mPosX = x - 5 + ( rand() % 25 );
+//            mPosY = y - 5 + ( rand() % 25 );
+//
+//            //Initialize animation
+//            mFrame = rand() % 5;
+//
+//            //Set type
+//            switch( rand() % 3 )
+//            {
+//                case 0: mTexture = &gRedTexture; break;
+//                case 1: mTexture = &gGreenTexture; break;
+//                case 2: mTexture = &gBlueTexture; break;
+//            }
+//        }
+//
+//        void update(float angleInDegree)
+//        {
+//            float flightDistance = 10;
+//            float displaceX = cos((angleInDegree + (rand() % 180 - 90))/180.0*3.14159) * flightDistance;
+//            float displaceY = -sin((angleInDegree + (rand() % 180 - 90))/180.0*3.14159) * flightDistance;
+//            mPosX += displaceX;
+//            mPosY += displaceY;
+//        }
+//
+//        void render(float angle = 0)
+//        {
+//            //Show image
+//            mTexture->render( mPosX, mPosY, NULL, angle );
+//
+//            //Show shimmer
+//            if( mFrame % 2 == 0 )
+//            {
+//                gShimmerTexture.render( mPosX, mPosY );
+//            }
+//
+//            //Animate
+//            mFrame++;
+//        }
+//
+//        bool isDead()
+//        {
+//            return mFrame > 10;
+//        }
+//
+//	private:
+//		//Offsets
+//		int mPosX, mPosY;
+//
+//		//Current frame of animation
+//		int mFrame;
+//
+//		//Type of particle
+//		Texture *mTexture;
+//};
 
+//{
+//    Dot::Dot()//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//    {
+//        //Initialize the offsets
+//        mPosX = 0;
+//        mPosY = 0;
+//
+//        //Initialize the velocity
+//        mVelX = 0;
+//        mVelY = 0;
+//
+//        //Initialize particles
+//        for( int i = 0; i < TOTAL_PARTICLES; ++i )
+//        {
+//            particles[ i ] = new Particle( mPosX, mPosY );
+//        }
+//    }
+//
+//    Dot::~Dot()
+//    {
+//        //Delete particles
+//        for( int i = 0; i < TOTAL_PARTICLES; ++i )
+//        {
+//            delete particles[ i ];
+//        }
+//    }
+//
+//    void Dot::handleEvent( SDL_Event& e )
+//    {
+//        //If a key was pressed
+//        if( e.type == SDL_KEYDOWN && e.key.repeat == 0 )
+//        {
+//            //Adjust the velocity
+//            switch( e.key.keysym.sym )
+//            {
+//                case SDLK_UP: mVelY -= DOT_VEL; break;
+//                case SDLK_DOWN: mVelY += DOT_VEL; break;
+//                case SDLK_LEFT: mVelX -= DOT_VEL; break;
+//                case SDLK_RIGHT: mVelX += DOT_VEL; break;
+//            }
+//        }
+//        //If a key was released
+//        else if( e.type == SDL_KEYUP && e.key.repeat == 0 )
+//        {
+//            //Adjust the velocity
+//            switch( e.key.keysym.sym )
+//            {
+//                case SDLK_UP: mVelY += DOT_VEL; break;
+//                case SDLK_DOWN: mVelY -= DOT_VEL; break;
+//                case SDLK_LEFT: mVelX += DOT_VEL; break;
+//                case SDLK_RIGHT: mVelX -= DOT_VEL; break;
+//            }
+//        }
+//    }
+//
+//    void Dot::move()
+//    {
+//        //Move the dot left or right
+//        mPosX += mVelX;
+//
+//        //If the dot went too far to the left or right
+//        if( ( mPosX < 0 ) || ( mPosX + DOT_WIDTH > SCREEN_WIDTH ) )
+//        {
+//            //Move back
+//            mPosX -= mVelX;
+//        }
+//
+//        //Move the dot up or down
+//        mPosY += mVelY;
+//
+//        //If the dot went too far up or down
+//        if( ( mPosY < 0 ) || ( mPosY + DOT_HEIGHT > SCREEN_HEIGHT ) )
+//        {
+//            //Move back
+//            mPosY -= mVelY;
+//        }
+//    }
+//
+//    void Dot::render()
+//    {
+//        //Show the dot
+//        gDotTexture.render( mPosX, mPosY );
+//
+//        //Show particles on top of dot
+//        renderParticles();
+//    }
+//
+//    void Dot::renderParticles()
+//    {
+//        //Go through particles
+//        for( int i = 0; i < TOTAL_PARTICLES; ++i )
+//        {
+//            //Delete and replace dead particles
+//            if( particles[ i ]->isDead() )
+//            {
+//                delete particles[ i ];
+//                particles[ i ] = new Particle( mPosX, mPosY );
+//            }
+//        }
+//
+//        //Show particles
+//        for( int i = 0; i < TOTAL_PARTICLES; ++i )
+//        {
+//            particles[ i ]->render();
+//            particles[ i ]->update(-135);
+//        }
+//    }
+//}
 class Boss : public Object
 {
 public:
@@ -291,7 +447,7 @@ public:
     {
         cbox.x = xPos;
         cbox.y = yPos;
-//        txtr = &dumb;
+        txtr = &dumb;
         cbox.w = txtr->getWidth();
         cbox.h = txtr->getHeight();
     }
@@ -338,19 +494,19 @@ public:
         {
             switch(e.button.button)
             {
-                case SDL_BUTTON_RIGHT:
-                    xTargetDst = e.motion.x+camera.x;
-                    yTargetDst = e.motion.y+camera.y;
+            case SDL_BUTTON_RIGHT:
+                xTargetDst = e.motion.x+camera.x;
+                yTargetDst = e.motion.y+camera.y;
 ////                    std::cout << "emotionx,emotiony) = (" << e.motion.x << "," << e.motion.y << ")" << std::endl;
 //                    std::cout << "(xTarget,yTarget) = (" << xTargetDst << "," << yTargetDst << ")" << std::endl;
 //                    std::cout << sin(90*3.14159/180);
 //                    std::cout << calculateAngle();
-                    break;
-                case SDL_BUTTON_LEFT:
-                    xAttackDst = e.motion.x+camera.x;
-                    yAttackDst = e.motion.y+camera.y;
-                    std::cout << "(xAttack,yAttack) = (" << xAttackDst << "," << yAttackDst << ")" << std::endl;
-                    break;
+                break;
+            case SDL_BUTTON_LEFT:
+                xAttackDst = e.motion.x+camera.x;
+                yAttackDst = e.motion.y+camera.y;
+                std::cout << "(xAttack,yAttack) = (" << xAttackDst << "," << yAttackDst << ")" << std::endl;
+                break;
             }
         }
     }
@@ -362,26 +518,23 @@ private:
 //    SDL_Rect BossCollisionBox;
 };
 
-std::vector<Slime*> slimes;
-class Slime : public Object
+std::vector<Enemy*> slimes;
+class Enemy : public Object
 {
 public:
     int SLIME_WIDTH = 42;
     int SLIME_HEIGHT = 30;
     int VEL = 3;
-    Slime(int x, int y, int health) : Object(x, y, health)
+    Enemy(int x, int y, int health) : Object(x, y, health)
     {
         txtr = &slime;
         cbox = {xPos + 6, yPos + 30, SLIME_WIDTH, SLIME_HEIGHT};
         xVel = 0;
         yVel = 0;
-        visionRange = 200;
-        attackRange = 100;
-        chargingAmount = 0;
-        chargingAttack = false;
         displace = false;
+        slimes.push_back(this);
     }
-//    ~Slime()
+//    ~Enemy()
 //    {
 //        txtr->free();
 //    }
@@ -389,89 +542,13 @@ public:
     int frame = 0;
     void render()
     {
-        renderHealth();
         SDL_Rect* CurrentClip;
         CurrentClip = &slimeSprite[frame/6];
         txtr->render(xPos - camera.x, yPos - camera.y, CurrentClip);
 
+        renderHealth();
         frame++;
         if (frame / 6 >= SLIME_SPRITE_COUNT)
-        {
-            frame = 0;
-        }
-////        std::cout << "slimexy = (" << xPos << "," << yPos <<")" << std::endl;
-    }
-    void renderHealth()
-    {
-        SDL_Rect rendercbox = {cbox.x - camera.x, cbox.y - camera.y, cbox.w, cbox.h};
-        SDL_SetRenderDrawColor(renderer, 128,0,0,0);
-        SDL_RenderFillRect(renderer, &rendercbox);
-        SDL_Rect healthBar = {xPos-camera.x, yPos-camera.y, health/2, 5};
-        SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x0F, 0xFF);
-        SDL_RenderFillRect(renderer, &healthBar);
-    }
-    void move(Player& player);
-
-    void attack(Player& player);
-
-    void updateStatus(int damage)
-    {
-        health -= damage;
-    }
-
-    float knockbackamount = 50;
-    void knockback(float angle)
-    {
-        displace = true;
-        float displaceX = cos((angle)/180.0*3.14159) * knockbackamount;
-        float displaceY = -sin((angle)/180.0*3.14159) * knockbackamount;
-        xPos += displaceX; cbox.x = xPos+6;
-        yPos += displaceY; cbox.y = yPos+30;
-
-//        displace = false;
-//        std::cout << "sin(135) = " << sin(135.0/180.0*3.14159) << std::endl;
-    }
-private:
-    float xVel, yVel;
-    bool displace;
-    int visionRange;
-    int attackRange;
-    bool chargingAttack;
-    int chargingAmount;
-    int stunDuration;
-};
-
-std::vector<Snake*> snakes;
-class Snake : public Object
-{
-public:
-    int SNAKE_WIDTH = 44;
-    int SNAKE_HEIGHT = 30;
-    int VEL = 3;
-    Snake(int x, int y, int health) : Object(x, y, health)
-    {
-        txtr = &snake;
-        cbox = {xPos, yPos, SNAKE_WIDTH, SNAKE_HEIGHT};
-        xVel = 0;
-        yVel = 0;
-        displace = false;
-        currentDirection = rand() % 2;
-    }
-
-    int frame = 0;
-    void render()
-    {
-        renderHealth();
-        SDL_Rect* CurrentClip;
-        CurrentClip = &snakeSprite[frame/6];
-        if (currentDirection == right)
-            txtr->render(xPos - camera.x, yPos - camera.y, CurrentClip, 180, NULL,SDL_FLIP_VERTICAL);
-        else if (currentDirection == left)
-            txtr->render(xPos - camera.x, yPos - camera.y, CurrentClip);
-
-
-        frame++;
-        if (frame / 6 >= SNAKE_SPRITE_COUNT)
         {
             frame = 0;
         }
@@ -505,52 +582,20 @@ public:
         displace = true;
         float displaceX = cos((angle)/180.0*3.14159) * knockbackamount;
         float displaceY = -sin((angle)/180.0*3.14159) * knockbackamount;
-        xPos += displaceX; cbox.x = xPos;
-        yPos += displaceY; cbox.y = yPos;
+        xPos += displaceX;
+        cbox.x = xPos+6;
+        yPos += displaceY;
+        cbox.y = yPos+30;
+
+//displace = false;
+        std::cout << "sin(135) = " << sin(135.0/180.0*3.14159) << std::endl;
     }
 private:
     float xVel, yVel;
-    int currentDirection;
     bool displace;
-    int visionRange;
-    int stunDuration;
 };
 
 std::vector<coin*> coins;
-
-class heart
-{
-public:
-    heart(int x, int y)
-    {
-        heartTexture = &Coin;
-        collected = false;
-        heartCollisionBox = {x, y, 40, 30};
-    }
-    int frame = 0;
-    void render()
-    {
-        SDL_Rect* CurrentClip;
-        CurrentClip = &heartSprite[frame/6];
-        heartTexture->render(heartCollisionBox.x - heartCollisionBox.x, heartCollisionBox.y - camera.y, CurrentClip);
-        frame++;
-        if (frame/6 > HEART_SPRITE_COUNT)
-            frame = 0;
-    }
-    void update(Player& plyr);
-    bool gotCollected()
-    {
-        return collected;
-    }
-    SDL_Rect getHeartBox()
-    {
-        return heartCollisionBox;
-    }
-private:
-    bool collected;
-    SDL_Rect heartCollisionBox;
-    Texture* heartTexture;
-};
 
 class coin
 {
@@ -566,10 +611,10 @@ public:
     void render()
     {
         SDL_Rect* CurrentClip;
-        CurrentClip = &coinSprite[frame/30];
+        CurrentClip = &coinSprite[frame/6];
         cointxtr->render(coinbox.x - camera.x, coinbox.y - camera.y, CurrentClip);
         frame++;
-        if (frame/30 > COIN_SPRITE_COUNT)
+        if (frame/6 > COIN_SPRITE_COIN)
             frame = 0;
     }
 
@@ -590,142 +635,179 @@ private:
     Texture* cointxtr;
 };
 
+class projectile : public Object
+{
+public:
+    projectile(int x, int y) : Object(x, y)
+    {
+        xVel = 0;
+        yVel = 0;
+        txtr = &arrow;
+        colBox = { xPos, yPos, 360, 50};
+        projectiles.push_back(this);
+    }
+
+    void render()
+    {
+        txtr->render(xPos - camera.x, yPos - camera.y, NULL, angle);
+    }
+
+    int getAngle()
+    {
+        return angle;
+    }
+
+    SDL_Rect getColBox()
+    {
+        return colBox;
+    }
+private:
+    float xVel, yVel;
+    int angle;
+    SDL_Rect colBox;
+};
+
 class Player : public Object
 {
-    public:
-        const int playerSpriteWidth = 36;
-        const int playerSpriteHeight = 46;
+public:
+    const int playerSpriteWidth = 36;
+    const int playerSpriteHeight = 46;
 
-        Player(int x, int y, int inithealth) : Object(x, y, inithealth)
-        {
-            cbox.x = xPos+4;//plus offset
-            cbox.y = yPos+6;
+    Player(int x, int y, int inithealth) : Object(x, y, inithealth)
+    {
+        cbox.x = xPos+4;//plus offset
+        cbox.y = yPos+6;
+        xVel = 0;
+        yVel = 0;
+        xAcc = 0;
+        yAcc = 0;
+        money = 0;
+        currentWeapon = sword;//////////////////////
+        //isWalking = false;
+        currentDirection = down;
+        txtr = &link;
+        cbox.w = playerSpriteWidth; //link width in pixel
+        cbox.h = playerSpriteHeight;//link height
+    }
+
+    void move(std::vector<Object*> objs, Boss boss, std::vector<Enemy*> enemies)
+    {
+        float xspeedDif = speedCap - abs(xVel);
+        float xease = xspeedDif * xAcc/3;
+        xVel += xease;
+        if (-speedCap > xVel)
+            xVel = -speedCap;
+        if (xVel > speedCap)
+            xVel = speedCap;
+        float yspeedDif = speedCap - abs(yVel);
+        float yease = yspeedDif * yAcc/3;
+        yVel += yease;
+        if (-speedCap > yVel)
+            yVel = -speedCap;
+        if (yVel > speedCap)
+            yVel = speedCap;
+        /*if (xAcc > 0)
+            xAcc -= friction;
+        else if (xAcc < 0)
+            xAcc += friction;
+        if (xAcc < friction && xAcc > -friction)
+            xAcc = 0;*/
+        //std::cout << "xVel: " << xVel << " xAcc = " << xAcc <<std::endl;
+        //friction decelleration
+        if (xVel > 0)
+            xVel -= friction;
+        else if (xVel < 0)
+            xVel += friction;
+        if (xVel < friction && xVel > -friction)
             xVel = 0;
+        if (yVel > 0)
+            yVel -= friction;
+        else if (yVel < 0)
+            yVel += friction;
+        if (yVel < friction && yVel > -friction)
             yVel = 0;
-            xAcc = 0;
-            yAcc = 0;
-            money = 0;
+
+        if (xVel > 0)
+            currentDirection = right;
+        else if (xVel < 0)
+            currentDirection = left;
+        if (yVel > 0)
             currentDirection = down;
-            currentWeapon = sword;
-            invincible = false;
-            invincibilityTimer = 0;
-            txtr = &link;
-            cbox.w = playerSpriteWidth; //link width in pixel
-            cbox.h = playerSpriteHeight;//link height
-        }
+        else if (yVel < 0)
+            currentDirection = up;
 
-        void move(std::vector<Object*> objs, std::vector<Slime*> enemies)
+        if (xVel > 0 && yVel == 0)/////////////////////////////////
+            currentAttackingDirection = _right;
+        else if (xVel < 0 && yVel == 0)
+            currentAttackingDirection = _left;
+        if (yVel > 0 && xVel == 0)
+            currentAttackingDirection = _down;
+        else if (yVel < 0 && xVel == 0)
+            currentAttackingDirection = _up;
+        if (xVel > 0 && yVel > 0)
+            currentAttackingDirection = downright;
+        else if (xVel > 0 && yVel < 0)
+            currentAttackingDirection = upright;
+        else if (xVel < 0 && yVel < 0)
+            currentAttackingDirection  = upleft;
+        else if (xVel < 0 && yVel > 0)
+            currentAttackingDirection = downleft;/////////////////////////
+//        std::cout << "curerntattckingdoirectoibn: " << currentAttackingDirection << std::endl;
+
+        xPos += xVel;
+        cbox.x = xPos+4;//plus offset
+        if (xPos < 0 || (xPos + 48/*CurrentClip->w*/) > LEVEL_WIDTH || checkCollisionObj(cbox, objs) || checkCollision(cbox, boss.getColBox()) || checkCollisionEnemy(cbox, slimes))
         {
-            float xspeedDif = speedCap - abs(xVel);
-            float xease = xspeedDif * xAcc/3;
-            xVel += xease;
-            if (-speedCap > xVel)
-                xVel = -speedCap;
-            if (xVel > speedCap)
-                xVel = speedCap;
-            float yspeedDif = speedCap - abs(yVel);
-            float yease = yspeedDif * yAcc/3;
-            yVel += yease;
-            if (-speedCap > yVel)
-                yVel = -speedCap;
-            if (yVel > speedCap)
-                yVel = speedCap;
-            /*if (xAcc > 0)
-                xAcc -= friction;
-            else if (xAcc < 0)
-                xAcc += friction;
-            if (xAcc < friction && xAcc > -friction)
-                xAcc = 0;*/
-            //std::cout << "xVel: " << xVel << " xAcc = " << xAcc <<std::endl;
-            //friction decelleration
-            if (xVel > 0)
-                xVel -= friction;
-            else if (xVel < 0)
-                xVel += friction;
-            if (xVel < friction && xVel > -friction)
-                xVel = 0;
-            if (yVel > 0)
-                yVel -= friction;
-            else if (yVel < 0)
-                yVel += friction;
-            if (yVel < friction && yVel > -friction)
-                yVel = 0;
-
-            if (xVel > 0)
-                currentDirection = right;
-            else if (xVel < 0)
-                currentDirection = left;
-            if (yVel > 0)
-                currentDirection = down;
-            else if (yVel < 0)
-                currentDirection = up;
-
-            if (xVel > 0 && yVel == 0)
-                currentAttackingDirection = _right;
-            else if (xVel < 0 && yVel == 0)
-                currentAttackingDirection = _left;
-            if (yVel > 0 && xVel == 0)
-                currentAttackingDirection = _down;
-            else if (yVel < 0 && xVel == 0)
-                currentAttackingDirection = _up;
-            if (xVel > 0 && yVel > 0)
-                currentAttackingDirection = downright;
-            else if (xVel > 0 && yVel < 0)
-                currentAttackingDirection = upright;
-            else if (xVel < 0 && yVel < 0)
-                currentAttackingDirection  = upleft;
-            else if (xVel < 0 && yVel > 0)
-                currentAttackingDirection = downleft;
-
-            xPos += xVel;
-            cbox.x = xPos+4;//plus offset
-            if (xPos < 0 || (xPos + playerSpriteWidth) > LEVEL_WIDTH || checkCollisionObj(cbox, objs) || checkCollisionEnemy(cbox, slimes))
-            {
 //                std::cout << checkCollisionObj(cbox, objs);
-                xPos -= xVel;
-            }
-            yPos += yVel;
-            cbox.y = yPos+6;
-            if (yPos < 0 || (yPos + playerSpriteHeight)> LEVEL_HEIGHT || checkCollisionObj(cbox, objs) )
-            {
-                yPos -= yVel;
-            }
+            xPos -= xVel;
         }
-
-        int frame = 4;
-        void render()
+        yPos += yVel;
+        cbox.y = yPos+6;
+        if (yPos < 0 || (yPos + 52/*CurrentClip->h*/)> LEVEL_HEIGHT || checkCollisionObj(cbox, objs) || checkCollision(cbox, boss.getColBox()))
         {
-            //SDL_Rect* CurrentClip = &spriteWalkleft[frame / 4];
+            yPos -= yVel;
+        }
+    }
 
-            SDL_Rect* CurrentClip;
+    int frame = 4;
+    void render()
+    {
+        //SDL_Rect* CurrentClip = &spriteWalkleft[frame / 4];
 
-            if (xVel != 0 || yVel != 0)
-            {
-                CurrentClip = &direction[currentDirection][frame/4];
-                Mix_PlayChannel(-1, footstep, -1);
-            }
-            else
-            {
-                CurrentClip = &direction[currentDirection][0];
-                Mix_HaltChannel(-1);
-            }
+        SDL_Rect* CurrentClip;
+
+        if (xVel != 0 || yVel != 0)
+        {
+            CurrentClip = &direction[currentDirection][frame/4];
+            Mix_PlayChannel(-1, footstep, -1);
+        }
+        else
+        {
+            CurrentClip = &direction[currentDirection][0];
+            Mix_HaltChannel(-1);
+        }
 
 //            std::cout << "xVel: " << xVel << " yVel: " << yVel << std::endl;
 //            SDL_RenderFillRect(renderer, &cbox);//render underlying collisionbox
-            txtr->render(xPos - camera.x, yPos - camera.y, CurrentClip);
-            renderHealth();
-            frame++;
-            if (frame / 4 >= 11)
-            {
-                frame = 4;
-            }
-        }
-
-        void renderHealth()
+        txtr->render(xPos - camera.x, yPos - camera.y, CurrentClip);
+        renderHealth();
+        frame++;
+        if (frame / 4 >= 11)
         {
-            SDL_Rect healthBar = {xPos - camera.x, yPos - camera.y, health/2, 10};
-            SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x0F, 0xFF);
-            SDL_RenderFillRect(renderer, &healthBar);
+            frame = 4;
+        }
+    }
+
+//        void renderHitCone()
+//        {
+//            if ()
+//        }
+
+    void renderHealth()
+    {
+        SDL_Rect healthBar = {xPos - camera.x, yPos - camera.y, health/2, 10};
+        SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x0F, 0xFF);
+        SDL_RenderFillRect(renderer, &healthBar);
 
 //            for (int i = 0; i < 6; i++)
 //            {
@@ -733,191 +815,163 @@ class Player : public Object
 //                SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 //                SDL_RenderDrawRect(renderer, &healthBaroutline);
 //            }
-        }
+    }
+    void collectCoin()
+    {
+        money++;
+        std::cout << "couin: " << money << std::endl;
+    }
+    void displayCoinCount()
+    {
 
-        void collectCoin()
+    }
+
+    void update()
+    {
+
+    }
+
+    void attack(std::vector<Object*> objs)
+    {
+        SDL_Rect attackBox;
+        int atkScale = 2;
+        if (currentDirection == up)
+            attackBox = {xPos-camera.x + 5, yPos - cbox.w/2 + 25 - camera.y - atkScale*cbox.h/2, cbox.w, cbox.h/2 * atkScale};
+        else if (currentDirection == down)
+            attackBox = {xPos-camera.x + 5, yPos + cbox.w + 10 - camera.y, cbox.w, cbox.h/2 * atkScale};
+        else if (currentDirection == right)
+            attackBox = {xPos-camera.x + cbox.w + 35, yPos - camera.y, cbox.w/2 * atkScale, cbox.h};
+        else if (currentDirection == left)
+            attackBox = {xPos-camera.x - cbox.w + 10 - atkScale*cbox.w/2, yPos - camera.y, cbox.w/2 * atkScale, cbox.h};
+
+        SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x0F, 0xFF);
+        SDL_RenderFillRect(renderer, &attackBox);
+
+        for (auto obj : objs)
         {
-            money++;
-            std::cout << "couin: " << money << std::endl;
-        }
-
-        void collectHeart()
-        {
-            health += 5;
-        }
-
-        void displayCoinCount()
-        {
-
-        }
-
-        void update(int damage = 0)
-        {
-            std::cout <<"about to do somedamgeag to stupid" << std::endl;
-            if (damage > 0 && invincible == false)
-            {
-                std::cout << "took damege" << std::endl;
-                health -= damage;
-                invincible = true;
-            }
-            if (invincible == true)
-            {
-                invincibilityTimer++;
-            }
-            if (invincibilityTimer > 120)
-            {
-                invincible = false;
-                invincibilityTimer = 0;
-            }
-        }
-
-        void attack(std::vector<Object*> objs)
-        {
-            SDL_Rect attackBox;
-            int atkScale = 1;
-            if (currentDirection == up)
-                attackBox = {xPos-camera.x + 5, yPos - cbox.w/2 + 25 - camera.y - atkScale*cbox.h/2, cbox.w, cbox.h * atkScale};
-            else if (currentDirection == down)
-                attackBox = {xPos-camera.x + 5, yPos + cbox.w - camera.y - 10, cbox.w, cbox.h * atkScale};
-            else if (currentDirection == right)
-                attackBox = {xPos-camera.x + cbox.w, yPos - camera.y, cbox.w * atkScale, cbox.h};
-            else if (currentDirection == left)
-                attackBox = {xPos-camera.x - cbox.w + 20 - atkScale*cbox.w/2, yPos - camera.y, cbox.w * atkScale, cbox.h};
-
-            SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x0F, 0xFF);
-            SDL_RenderFillRect(renderer, &attackBox);
-
-            for (auto obj : objs)
-            {
-//                std::cout << obj->getX() << "," << obj->getY() << std::endl;
-                SDL_Rect objBox = {obj->getColBox().x - camera.x, obj->getColBox().y - camera.y, obj->getColBox().w, obj->getColBox().h};
+            std::cout << obj->getX() << "," << obj->getY() << std::endl;
+            SDL_Rect objBox = {obj->getColBox().x - camera.x, obj->getColBox().y - camera.y, obj->getColBox().w, obj->getColBox().h};
 //                SDL_SetRenderDrawColor(renderer, 0, 255, 0, 50);
 //                SDL_RenderFillRect(renderer, &objBox);
-                if(checkCollision(attackBox, objBox))
+            if(checkCollision(attackBox, objBox))
+            {
+                if(obj != this)
                 {
-                    if(obj != this)
-                    {
-                        obj->updateStatus(5);
-                        SDL_Rect tmpcbox = {cbox.x + cbox.w/2, cbox.y + cbox.h/2, 0, 0};
-                        SDL_Rect tmpobjbox = {obj->getColBox().x + obj->getColBox().w/2, obj->getColBox().y + obj->getColBox().h/2};
-                        obj->knockback(angleBetweenRect(tmpcbox, tmpobjbox));
+                    obj->updateStatus(5);
+                    obj->knockback(angleBetweenRect(cbox, obj->getColBox()));
 //                        std::cout << angleBetweenRect(cbox, obj->getColBox()) << std::endl;
-                        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 50);
+                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 50);
 //                        int i = 0;
 //                        while(i<10)
 //                        {
 //                            i++;
 //                            std::cout << i << std::endl;
-                            SDL_RenderFillRect(renderer, &objBox);
+                    SDL_RenderFillRect(renderer, &objBox);
 //                            SDL_Delay(1000);
 //                        }
-                    }
                 }
             }
         }
+    }
 
-        void shoot()
+    void shoot()
+    {
+        projectile* arrow = new projectile(xPos, yPos);
+        arrow->render();
+    }
+
+    void handleInput(SDL_Event& e)
+    {
+        if (e.type == SDL_KEYDOWN && e.key.repeat == 0)
         {
-
-        }
-
-        void handleInput(SDL_Event& e)
-        {
-            if (e.type == SDL_KEYDOWN && e.key.repeat == 0)
+            switch(e.key.keysym.sym)
             {
-                switch(e.key.keysym.sym)
-                {
-                    case SDLK_w:
-                        yAcc -= ACC;
-                        break;
-                    case SDLK_a:
-                        xAcc -= ACC;
-                        break;
-                    case SDLK_s:
-                        yAcc += ACC;
-                        break;
-                    case SDLK_d:
-                        xAcc += ACC;
-                        break;
-                    case SDLK_r:
-                        std::cout << currentWeapon <<std::endl;
-                        if(currentWeapon == sword)
-                            currentWeapon = bow;
-                        else if (currentWeapon == bow)
-                            currentWeapon = sword;
-                        break;
-                    case SDLK_v:
-                        if (currentWeapon == sword)
-                            attack(objects);
-                        else if (currentWeapon == bow)
-                            shoot();
-                        charging = true;
-                        std::cout << "pressing v" << std::endl;
-                        break;
-                    case SDLK_f:
-                        ACC = 1;
-                        std::cout << "pressing F" << std::endl;
-                        break;
-                }
+            case SDLK_w:
+                yAcc -= ACC;
+                break;
+            case SDLK_a:
+                xAcc -= ACC;
+                break;
+            case SDLK_s:
+                yAcc += ACC;
+                break;
+            case SDLK_d:
+                xAcc += ACC;
+                break;
+            case SDLK_r:////////////////////////////////////
+                std::cout << currentWeapon <<std::endl;
+                if(currentWeapon == sword)
+                    currentWeapon = bow;
+                else if (currentWeapon == bow)
+                    currentWeapon = sword;
+                break;
+            case SDLK_v:///////////////////////////////////
+                if (currentWeapon == sword)
+                    attack(objects);
+                else if (currentWeapon == bow)
+                    shoot();
+
+                charging = true;
+                std::cout << "pressing v" << std::endl;
+                break;
+            case SDLK_f:
+                ACC = 10;
+                std::cout << "pressing F" << std::endl;
+                break;
             }
-            if (e.type == SDL_KEYUP && e.key.repeat == 0)
+        }
+
+        if (e.type == SDL_KEYUP && e.key.repeat == 0)
+        {
+            switch(e.key.keysym.sym)
             {
-                switch(e.key.keysym.sym)
-                {
-                    case SDLK_w:
-                        yAcc += ACC;
-                        break;
-                    case SDLK_a:
-                        xAcc += ACC;
-                        break;
-                    case SDLK_s:
-                        yAcc -= ACC;
-                        break;
-                    case SDLK_d:
-                        xAcc -= ACC;
-                        break;
-                    case SDLK_v:
-                        charging = false;
-                        std::cout << "releasing v" << std::endl;
-                        break;
-                    case SDLK_f:
-                        ACC = 0.5;
-                        std::cout << "release F" << std::endl;
-                        break;
-                }
+            case SDLK_w:
+                yAcc += ACC;
+                break;
+            case SDLK_a:
+                xAcc += ACC;
+                break;
+            case SDLK_s:
+                yAcc -= ACC;
+                break;
+            case SDLK_d:
+                xAcc -= ACC;
+                break;
+            case SDLK_v:
+                charging = false;
+                std::cout << "releasing v" << std::endl;
+                break;
+            case SDLK_f:
+                ACC = 0.5;
+                std::cout << "release F" << std::endl;
+                break;
             }
         }
+    }
 
-        float getX()
-        {
-            return xPos;
-        }
+    float getX()
+    {
+        return xPos;
+    }
 
-        float getY()
-        {
-            return yPos;
-        }
+    float getY()
+    {
+        return yPos;
+    }
 
-        bool isInvincible()
-        {
-            return invincible;
-        }
-    private:
-        float xVel, yVel;
-        float xAcc, yAcc;
-        float ACC = 0.5;
-        float speedCap = 5;
-        float friction = 0.3;
-        //float Boost = 1;
+private:
+    float xVel, yVel;
+    float xAcc, yAcc;
+    float ACC = 0.5;
+    float speedCap = 5;
+    float friction = 0.3;
+    //float Boost = 1;
 
-        bool invincible;
-        int invincibilityTimer;
-        int money;
-        int currentWeapon;
-        bool charging;
-        int currentDirection;
-        int currentAttackingDirection;
-
+    int money;
+    int currentWeapon;
+    bool charging;
+    int currentDirection;
+    int currentAttackingDirection;
 //        SDL_Rect playerCollisionBox;
 };
 
@@ -930,28 +984,8 @@ void coin::update(Player& plyr)
     }
 }
 
-void heart::update(Player& plyr)
+void Enemy::move(Player& player)
 {
-    if (checkCollision(heartCollisionBox, plyr.getColBox()) && !collected)
-    {
-        plyr.collectHeart();
-        collected = true;
-    }
-}
-
-void Slime::move(Player& player)
-{
-    if (displace == true)
-    {
-        stunDuration++;
-//        std::cout << stunDuration << std::endl;
-        if (stunDuration >= 60)
-        {
-            displace = false;
-            stunDuration = 0;
-        }
-
-    }
     if (distanceBetweenRect(cbox, player.getColBox()) < 500 && displace == false)
     {
         float deltaX = abs(xPos - player.getColBox().x);
@@ -994,104 +1028,6 @@ void Slime::move(Player& player)
             }
             cbox.x = xPos+6;
             cbox.y = yPos+30;
-//            SDL_Rect rendercbox = {cbox.x - camera.x, cbox.y - camera.y, cbox.w, cbox.h};
-//            SDL_SetRenderDrawColor(renderer, 128,0,0,0);
-//            SDL_RenderFillRect(renderer, &rendercbox);
-        }
-    }
-}
-
-void Slime::attack(Player& player)
-{
-    SDL_Rect attackZone;
-    SDL_Rect renderAttackZone;
-    if(distanceBetweenRect(cbox, player.getColBox()) <= attackRange && !chargingAttack)
-    {
-        std::cout << "chargiong" << std::endl;
-        displace = true;
-        chargingAttack = true;
-        attackZone = player.getColBox();
-        renderAttackZone = {attackZone.x - camera.x, attackZone.y - camera.y, attackZone.w, attackZone.h};
-    }
-    if (chargingAttack == true)
-    {
-        chargingAmount++;
-        SDL_SetRenderDrawColor(renderer, 255, 0, (int)(chargingAmount/200.0*255.0), 255);
-        SDL_RenderFillRect(renderer, &renderAttackZone);
-//        std::cout << (int)(chargingAmount/120.0*255.0) << std::endl;
-    }
-    if (chargingAmount >= 200)
-    {
-        std::cout << checkCollision(player.getColBox(), attackZone) << std::endl;
-        SDL_Rect renderPlayerBox = {player.getColBox().x - camera.x, player.getColBox().y - camera.y, player.getColBox().w, player.getColBox().h};
-        if (checkCollision(renderPlayerBox, renderAttackZone) == true)
-        {
-            std::cout << "atking plyr" <<std::endl;
-            player.update(5);
-        }
-        chargingAmount = 0;
-        chargingAttack = false;
-    }
-}
-
-void Snake::move(Player& player)
-{
-    if (displace == true)
-    {
-        stunDuration++;
-//        std::cout << stunDuration << std::endl;
-        if (stunDuration >= 200)
-        {
-            displace = false;
-            stunDuration = 0;
-        }
-    }
-    if (distanceBetweenRect(cbox, player.getColBox()) < 500 && displace == false)
-    {
-        float deltaX = abs(xPos - player.getColBox().x);
-        float deltaY = abs(yPos - player.getColBox().y);
-        if (xPos > player.getColBox().x) xVel = -VEL;
-        else if (xPos < player.getColBox().x) xVel = VEL;
-        if (yPos > player.getColBox().y) yVel = -VEL;
-        else if (yPos < player.getColBox().y) yVel = VEL;
-        if (xPos != player.getColBox().x || yPos != player.getColBox().y)
-        {
-            if (deltaX > deltaY)
-            {
-                if (xPos != player.getColBox().x)
-                {
-                    xPos += xVel;
-                    if (checkCollision(cbox, player.getColBox()))
-                        xPos -= xVel;
-                }
-                if(yPos != player.getColBox().y)
-                {
-                    yPos += yVel*(deltaY/deltaX);
-                    if (checkCollision(cbox, player.getColBox()))
-                        yPos -= yVel*(deltaY/deltaX);
-                }
-            }
-            else if (deltaY > deltaX)
-            {
-                if (xPos != player.getColBox().x)
-                {
-                    xPos += xVel*(deltaX/deltaY);
-                    if (checkCollision(cbox, player.getColBox()))
-                        xPos -= xVel*(deltaX/deltaY);
-                }
-                if(yPos != player.getColBox().y)
-                {
-                    yPos += yVel;
-                    if (checkCollision(cbox, player.getColBox()))
-                        yPos -= yVel;
-                }
-            }
-            if (xVel > 0)
-                currentDirection = right;
-            else
-                currentDirection = left;
-            cbox.x = xPos;
-            cbox.y = yPos;
 //            SDL_Rect rendercbox = {cbox.x - camera.x, cbox.y - camera.y, cbox.w, cbox.h};
 //            SDL_SetRenderDrawColor(renderer, 128,0,0,0);
 //            SDL_RenderFillRect(renderer, &rendercbox);
@@ -1157,39 +1093,6 @@ void Boss::move(Player p)
     }
 }
 
-class projectile : public Object
-{
-    public:
-        projectile()
-        {
-            xVel = 0;
-            yVel = 0;
-            txtr = nullptr;
-            colBox = { xPos, yPos, 10, 10};//temporaly
-            projectiles.push_back(this);
-        }
-
-        void render()
-        {
-            txtr->render(xPos - camera.x, yPos - camera.y);
-        }
-
-        int getAngle()
-        {
-            return angle;
-        }
-
-        SDL_Rect getColBox()
-        {
-            return colBox;
-        }
-    private:
-        float xVel, yVel;
-        int angle;
-        SDL_Rect colBox;
-
-};
-
 int main(int argc, char* argv[])
 {
     if (init("help") == false)
@@ -1200,116 +1103,152 @@ int main(int argc, char* argv[])
             std::cout << "Failed to load asset" << std::endl;
         else
         {
-            srand(time(0));
-
-//            for (int i = 0; i < 10; i++)
-//                std::cout << rand() % 2;
-
             bool exit = false;
             SDL_Event e;
 //            coin* coins[10];
-////            Boss boss(200, 200, 200);
 
-            Player* p1 = new Player(1000, 200, 100);
-//            Player* p2 = new Player(800, 150, 100);
-//            Slime* slime = new Slime(600, 300, 5);
-//            Slime* slime2 = new Slime(300, 300, 20);
-//            Snake* sn = new Snake(800, 800, 20);
-
+            Player p1(1000, 200, 100);
+            Player p2(800, 150, 100);
+            Boss boss(200, 200, 200);
+            Enemy slime(600, 300, 50);
+            Enemy slime2(300, 300, 20);
+//            objects.push_back(p1);
+//            objects.push_back(p2);
+//            objects.push_back(boss);
 //            p1.getTexture();
 //
 //            p2.getTexture();
-//            SDL_Rect testrect = {400,400,50,20};
-            int enemyspawn = 0;
+            SDL_Rect testrect = {400,400,50,20};
             //main loop
+            int a = 0;
             while (!exit)
             {
+                if (a == 0)
+                {
+                    Texture theFuckingMenuTexture;
+                    theFuckingMenuTexture.loadFile("theFuckingMenu.png");
+                    while (SDL_PollEvent(&e) != 0)
+                    {
+                        SDL_RenderCopy(renderer, theFuckingMenuTexture.getTexture(), NULL, NULL);
+                        SDL_RenderPresent(renderer);
+                        if (e.type == SDL_QUIT)
+                        {
+                            exit = true;
+                        }
+                        if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_x)
+                        {
+                            a++;
+                        }
+                    }
+                }
+                else if (a == 1)
+                {
+                    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+                    SDL_RenderClear(renderer);
 
-                SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-				SDL_RenderClear(renderer);
-
-				camera.x = ( p1->getX()+ p1->getColBox().w / 2 ) - SCREEN_WIDTH / 2;
-				camera.y = ( p1->getY() + p1->getColBox().h / 2 ) - SCREEN_HEIGHT / 2;
+                    camera.x = ( p1.getX()+ p1.getColBox().w / 2 ) - SCREEN_WIDTH / 2;
+                    camera.y = ( p1.getY() + p1.getColBox().h / 2 ) - SCREEN_HEIGHT / 2;
 //				for(int i = 0; i < 1; i++)
 //                    p1.collectCoin();
 
-				//Keep the camera in bounds
-				if( camera.x < 0 )
-				{
-					camera.x = 0;
-				}
-				if( camera.y < 0 )
-				{
-					camera.y = 0;
-				}
-				if( camera.x > LEVEL_WIDTH - camera.w )
-				{
-					camera.x = LEVEL_WIDTH - camera.w;
-				}
-				if( camera.y > LEVEL_HEIGHT - camera.h )
-				{
-					camera.y = LEVEL_HEIGHT - camera.h;
-				}
-				background.render(0, 0, &camera);
-                //event loop
-                while (SDL_PollEvent(&e) != 0)
-                {
-                    if (e.type == SDL_QUIT)
+                    //Keep the camera in bounds
+                    if( camera.x < 0 )
                     {
-                        exit = true;
+                        camera.x = 0;
                     }
-                    p1->handleInput(e);
-//                    boss.handleInput(e);
+                    if( camera.y < 0 )
+                    {
+                        camera.y = 0;
+                    }
+                    if( camera.x > LEVEL_WIDTH - camera.w )
+                    {
+                        camera.x = LEVEL_WIDTH - camera.w;
+                    }
+                    if( camera.y > LEVEL_HEIGHT - camera.h )
+                    {
+                        camera.y = LEVEL_HEIGHT - camera.h;
+                    }
+                    background.render(0, 0, &camera);
+                    //event loop
+                    while (SDL_PollEvent(&e) != 0)
+                    {
+                        if (e.type == SDL_QUIT)
+                        {
+                            exit = true;
+                        }
+                        p1.handleInput(e);
+                        boss.handleInput(e);
+                        if (e.type = SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE && e.key.repeat == 0)
+                        {
+                            a++;
+                            std::cout << "a: " << a << std::endl;
+//                            break;
+
+                        }
 //                    p2.handleInput(e);
+                    }
+//                std::cout << frame << std::endl;
+                    //SDL_Rect* CurrentClip = &spriteWalkleft[frame / 4];
+
+//                std::cout << p1.getColBox().x << ", " << p1.getColBox().y << std::endl;
+
+                    SDL_Rect testrect2 = {testrect.x - camera.x, testrect.y - camera.y, testrect.w, testrect.h};
+                    SDL_SetRenderDrawColor(renderer, 255, 255, 0, 0);
+                    SDL_RenderFillRect(renderer, &testrect2);
+
+                    for (coin* c : coins)
+                    {
+                        c->render();
+                        c->update(p1);
+                    }
+                    slime.move(p1);
+                    slime2.move(p1);
+                    slime.render();
+                    slime2.render();
+                    p1.move(objects, boss, slimes);
+                    p1.render();
+                    boss.move(p1);
+                    boss.render();
+                    checkAlive();
+
+//				    std::cout << checkCollision(p1.getColBox(), boss.getColBox());
+
+//                  p2.move();
+                    p2.render();
+//                  std::cout << "p1: " << p1.getX() << "," << p1.getY() << std::endl;
+//                  std::cout << "p2: " << p2.getX() << "," << p2.getY() << std::endl;
+//				    std::cout << distanceBetween(p1, p2) << std::endl;
+
+                    SDL_RenderPresent(renderer);
                 }
-                spawnEnemy(enemyspawn);
-
-//				SDL_Rect testrect2 = {testrect.x - camera.x, testrect.y - camera.y, testrect.w, testrect.h};
-//				SDL_SetRenderDrawColor(renderer, 255, 255, 0, 0);
-//				SDL_RenderFillRect(renderer, &testrect2);
-
-				for (coin* c : coins)
+                else if (a == 2)
                 {
-                    c->render();
-                    c->update(*p1);
+                    Texture theFuckingResumeTexture;
+                    theFuckingResumeTexture.loadFile("theFuckingResumeMenu.png");
+                    SDL_RenderCopy(renderer, theFuckingResumeTexture.getTexture(), NULL, NULL);
+                    SDL_RenderPresent(renderer);
+                    while (SDL_PollEvent(&e) != 0)
+                    {
+
+                        if (e.type == SDL_QUIT)
+                        {
+                            exit = true;
+                        }
+                        if (e.type == SDL_KEYDOWN && e.key.repeat == 0)
+                        {
+                            switch( e.key.keysym.sym )
+                            {
+                            case SDLK_x:
+                                a--;
+//                            std::cout << "a: " << a << std::endl;
+                                break;
+                            case SDLK_ESCAPE:
+                                a = 0;
+                                break;
+                            }
+                        }
+                    }
                 }
-                for (Slime* e : slimes)
-                {
-                    e->attack(*p1);
-                    e->move(*p1);
-                    e->render();
-
-                }
-                for (Snake* s : snakes)
-                {
-                    s->move(*p1);
-                    s->render();
-                }
-
-//                sn->move(*p1);
-//                sn->render();
-//				slime->move(*p1);
-//				slime2->move(*p1);
-//				slime->render();
-//				slime2->render();
-				p1->move(objects, slimes);
-				p1->render();
-//				p2->render();
-
-				checkAlive();
-
-//				std::cout << checkCollision(p1.getColBox(), boss.getColBox());
-
-//                p2.move();
-
-//                std::cout << "p1: " << p1.getX() << "," << p1.getY() << std::endl;
-//                std::cout << "p2: " << p2.getX() << "," << p2.getY() << std::endl;
-//				std::cout << distanceBetween(p1, p2) << std::endl;
-
-				SDL_RenderPresent(renderer);
-
-
-
             }
         }
     }
@@ -1321,31 +1260,31 @@ bool init(std::string path)
 {
     bool success = true;
     if( SDL_Init( SDL_INIT_VIDEO | SDL_INIT_AUDIO ) < 0 )
-		success = false;
-	else
+        success = false;
+    else
     {
-		window = SDL_CreateWindow( path.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
-		if(window == NULL)
-			success = false;
-		else
-		{
-			renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-			if(renderer == NULL)
-				return false;
-			else
-			{
-				//SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+        window = SDL_CreateWindow( path.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
+        if(window == NULL)
+            success = false;
+        else
+        {
+            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+            if(renderer == NULL)
+                return false;
+            else
+            {
+                //SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 
-				int imgFlags = IMG_INIT_PNG;
-				if(!(IMG_Init( imgFlags ) & imgFlags))
-					success = false;
+                int imgFlags = IMG_INIT_PNG;
+                if(!(IMG_Init( imgFlags ) & imgFlags))
+                    success = false;
                 if( Mix_OpenAudio( 24100, MIX_DEFAULT_FORMAT, 2, 2048 ) < 0 )
                 {
                     printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
                     success = false;
                 }
-			}
-		}
+            }
+        }
     }
     return success;
 }
@@ -1372,15 +1311,10 @@ bool loadAsset()
         std::cout << "failed to load bg" << std::endl;
         success = false;
     }
-    if (snake.loadFile("snake.png") == false)
+    if (arrow.loadFile("arrow.png") == false)
     {
-        std::cout << "Failed to load coins" << std::endl;
+        std::cout << "Failed to load arrow" << std::endl;
         success = false;
-    }
-    else
-    {
-        for (int i = 0; i < SNAKE_SPRITE_COUNT; i++)
-            snakeSprite[i] = {44*i, 0, 44, 30};
     }
     if (Coin.loadFile("coin2.png") == false)
     {
@@ -1389,14 +1323,14 @@ bool loadAsset()
     }
     else
     {
-        for (int i = 0; i < COIN_SPRITE_COUNT; i++)
+        for (int i = 0; i < COIN_SPRITE_COIN; i++)
             coinSprite[i] = {40*i, 0, 40, 40};
     }
-//    if(dumb.loadFile("dummy.png") == false)
-//    {
-//        std::cout << "Failed to loadFile" << std::endl;
-//        success = false;
-//    }
+    if(dumb.loadFile("dummy.png") == false)
+    {
+        std::cout << "Failed to loadFile" << std::endl;
+        success = false;
+    }
     if (slime.loadFile("slime.png") == false)
     {
         std::cout << "Failed to loadFile" << std::endl;
@@ -1406,16 +1340,7 @@ bool loadAsset()
     {
         for (int i = 0; i < SLIME_SPRITE_COUNT; i++)
             slimeSprite[i] = {54*i, 0, 54, 66};
-    }
-    if (Heart.loadFile("heart.png") == false)
-    {
-        std::cout << "Failed to loadFile" << std::endl;
-        success = false;
-    }
-    else
-    {
-        for (int i = 0; i < HEART_SPRITE_COUNT; i++)
-            heartSprite[i] = {40*i, 0, 40, 30};
+
     }
     if (link.loadFile("link_sprite_new4.png") == false)
     {
@@ -1470,9 +1395,6 @@ void quit()
     Mix_FreeChunk(footstep);
     footstep = NULL;
     link.free();
-    snake.free();
-    Coin.free();
-    Heart.free();
     slime.free();
     background.free();
     SDL_DestroyWindow(window);
@@ -1482,76 +1404,27 @@ void quit()
     SDL_Quit();
 }
 
-void spawnEnemy(int& time)
-{
-    int SPAWNTIME = 60;
-    if(time < SPAWNTIME)
-    {
-        time++;
-//        std::cout << time <<std::endl;
-    }
-    else if (time >= SPAWNTIME)
-    {
-        float x = rand() % LEVEL_WIDTH;
-        float y = rand() % LEVEL_HEIGHT;
-        int enemy = rand() % ENEMY_TYPES;
-        if (enemy == SLIME)
-        {
-            Slime* sl = new Slime(x, y, 20);
-            slimes.push_back(sl);
-        }
-        else if (enemy == SNAKE)
-        {
-            Snake* sn = new Snake(x, y, 20);
-            snakes.push_back(sn);
-        }
-        time = 0;
-    }
-
-}
-
 void checkAlive()
 {
-//    for (auto obj : objects)
-//    {
-//        if (obj->getHealth() <= 0)
-//        {
-//            std::cout << "obj = {" << obj->getColBox().x << "," << obj->getColBox().y << "," << obj->getColBox().h << "," << obj->getColBox().h << "} " << "dead" << std::endl;
-//            coin* c = new coin(obj->getColBox().x, obj->getColBox().y);
-////            std::cout << "spowaing new coooin" <<std::endl;
-//            coins.push_back(c);
-//            obj->playDeathAnim();
-////            obj->setPos(-100, -100);
-//            objects.erase(std::remove(objects.begin(), objects.end(), obj), objects.end());
-//            delete obj;
-//        }
-//    }
-    for(Slime* sl : slimes)
+    for (auto obj : objects)
     {
-        if (sl->getHealth() <= 0)
+        if (obj->getHealth() <= 0)
         {
-            coin* c = new coin(sl->getColBox().x, sl->getColBox().y);
+            std::cout << "obj = {" << obj->getColBox().x << "," << obj->getColBox().y << "," << obj->getColBox().h << "," << obj->getColBox().h << "} " << "dead" << std::endl;
+            coin* c = new coin(obj->getColBox().x, obj->getColBox().y);
+            std::cout << "spowaing new coooin" <<std::endl;
             coins.push_back(c);
-            slimes.erase(std::remove(slimes.begin(), slimes.end(), sl), slimes.end());
-            delete sl;
+            objects.erase(std::remove(objects.begin(), objects.end(), obj), objects.end());
+            obj->playDeathAnim();
+            obj->setPos(-100, -100);
         }
     }
     for(coin* c : coins)
     {
         if (c->gotCollected() == true)
         {
-            coins.erase(std::remove(coins.begin(), coins.end(), c), coins.end());
             delete c;
-        }
-    }
-    for(Snake* snake : snakes)
-    {
-        if (snake->getHealth() <= 0)
-        {
-            coin* c = new coin(snake->getColBox().x, snake->getColBox().y);
-            coins.push_back(c);
-            snakes.erase(std::remove(snakes.begin(), snakes.end(), snake), snakes.end());
-            delete snake;
+            coins.erase(std::remove(coins.begin(), coins.end(), c), coins.end());
         }
     }
 }
@@ -1605,7 +1478,7 @@ bool checkCollisionObj (SDL_Rect a, std::vector<Object*> objs)
     return false;
 }
 
-bool checkCollisionEnemy(SDL_Rect a, std::vector<Slime*> enemies)
+bool checkCollisionEnemy (SDL_Rect a, std::vector<Enemy*> enemies)
 {
     for (auto enemy : enemies)
         return checkCollision(a, enemy->getColBox());
