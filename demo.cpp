@@ -34,6 +34,7 @@ SDL_Rect spriteWalkright[11];
 SDL_Rect spriteWalkleft[11];
 SDL_Rect spriteWalkup[11];
 SDL_Rect* direction[4] = {spriteWalkup, spriteWalkleft, spriteWalkdown, spriteWalkright};
+
 enum dir
 {
     up,
@@ -180,7 +181,7 @@ Texture background;
 Texture dumb;
 Texture slime;
 Texture Coin;
-Texture arrow; //pqd t3
+Texture arrowText; //pqd t3
 
 class Object
 {
@@ -519,6 +520,7 @@ private:
 };
 
 std::vector<Enemy*> slimes;
+
 class Enemy : public Object
 {
 public:
@@ -642,13 +644,16 @@ public:
     {
         xVel = 0;
         yVel = 0;
-        txtr = &arrow;
-        colBox = { xPos, yPos, 360, 50};
+        txtr = &arrowText;
+        colBox = new SDL_Rect { xPos, yPos, 360, 50};
         projectiles.push_back(this);
     }
 
-    void render()
+    void render(float _xPos, float _yPos, int _angle)
     {
+        xPos = _xPos;
+        yPos = _yPos;
+        angle = _angle;
         txtr->render(xPos - camera.x, yPos - camera.y, NULL, angle);
     }
 
@@ -657,14 +662,14 @@ public:
         return angle;
     }
 
-    SDL_Rect getColBox()
+    SDL_Rect* getColBox()
     {
         return colBox;
     }
 private:
     float xVel, yVel;
     int angle;
-    SDL_Rect colBox;
+    SDL_Rect* colBox;
 };
 
 class Player : public Object
@@ -877,7 +882,13 @@ public:
     void shoot()
     {
         projectile* arrow = new projectile(xPos, yPos);
-        arrow->render();
+        switch (currentAttackingDirection)
+        {
+            case _right:
+                SDL_Rect* renderQuad = new SDL_Rect{xPos, yPos, arrow->getColBox()->w, arrow->getColBox()->h};
+                SDL_RenderCopyEx(renderer, arrowText.getTexture(), NULL, renderQuad, 0, NULL, SDL_FLIP_NONE);
+                break;
+        }
     }
 
     void handleInput(SDL_Event& e)
@@ -1311,7 +1322,7 @@ bool loadAsset()
         std::cout << "failed to load bg" << std::endl;
         success = false;
     }
-    if (arrow.loadFile("arrow.png") == false)
+    if (arrowText.loadFile("arrow.png") == false)
     {
         std::cout << "Failed to load arrow" << std::endl;
         success = false;
