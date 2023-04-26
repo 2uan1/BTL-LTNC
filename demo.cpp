@@ -18,6 +18,8 @@ SDL_Window* window = NULL;
 
 SDL_Renderer* renderer = NULL;
 
+TTF_Font* font = NULL;
+
 SDL_Rect camera = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
 
 const int TOTAL_PARTICLES = 20;//PDQuan 25/4
@@ -146,6 +148,40 @@ public:
             return true;
     }
 
+    bool loadFromRenderedText( std::string textureText, SDL_Color textColor )
+    {
+        //Get rid of preexisting texture
+        free();
+
+        //Render text surface
+        SDL_Surface* textSurface = TTF_RenderText_Solid( font, textureText.c_str(), textColor );
+        if( textSurface == NULL )
+        {
+            printf( "Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError() );
+        }
+        else
+        {
+            //Create texture from surface pixels
+            dTexture = SDL_CreateTextureFromSurface( renderer, textSurface );
+            if( dTexture == NULL )
+            {
+                printf( "Unable to create texture from rendered text! SDL Error: %s\n", SDL_GetError() );
+            }
+            else
+            {
+                //Get image dimensions
+                tWidth = textSurface->w;
+                tHeight = textSurface->h;
+            }
+
+            //Get rid of old surface
+            SDL_FreeSurface( textSurface );
+        }
+
+        //Return success
+        return (dTexture != NULL);
+    }
+
     void free()
     {
         SDL_DestroyTexture(dTexture);
@@ -182,7 +218,7 @@ Texture dumb;
 Texture slime;
 Texture Coin;
 Texture arrowText; //pqd t3
-
+Texture textTexture;
 class Object
 {
 public:
@@ -826,7 +862,7 @@ public:
         money++;
         std::cout << "couin: " << money << std::endl;
     }
-    void displayCoinCount()
+    void displayCoinCount(Coin)
     {
 
     }
@@ -884,10 +920,10 @@ public:
         projectile* arrow = new projectile(xPos, yPos);
         switch (currentAttackingDirection)
         {
-            case _right:
-                SDL_Rect* renderQuad = new SDL_Rect{xPos, yPos, arrow->getColBox()->w, arrow->getColBox()->h};
-                SDL_RenderCopyEx(renderer, arrowText.getTexture(), NULL, renderQuad, 0, NULL, SDL_FLIP_NONE);
-                break;
+        case _right:
+            SDL_Rect* renderQuad = new SDL_Rect{xPos, yPos, arrow->getColBox()->w, arrow->getColBox()->h};
+            SDL_RenderCopyEx(renderer, arrowText.getTexture(), NULL, renderQuad, 0, NULL, SDL_FLIP_NONE);
+            break;
         }
     }
 
@@ -1260,6 +1296,15 @@ int main(int argc, char* argv[])
                         }
                     }
                 }
+                else if ( a == 3 ) // game over screen
+                {
+                    //Render text
+                    SDL_Color textColor = { 0, 0, 0 };
+                    if( !textTexture.loadFromRenderedText( "SDL is fucking hard", textColor ) )
+                    {
+                        printf( "Failed to render text texture!\n" );
+                    }
+                }
             }
         }
     }
@@ -1292,6 +1337,11 @@ bool init(std::string path)
                 if( Mix_OpenAudio( 24100, MIX_DEFAULT_FORMAT, 2, 2048 ) < 0 )
                 {
                     printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
+                    success = false;
+                }
+                if( TTF_Init() == -1 )
+                {
+                    printf( "SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError() );
                     success = false;
                 }
             }
@@ -1397,6 +1447,13 @@ bool loadAsset()
             spriteWalkright[i+1].h = 52;
         }
 
+    }
+    //Open the font
+    font = TTF_OpenFont( "lazy.ttf", 28 );
+    if( font == NULL )
+    {
+        printf( "Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError() );
+        success = false;
     }
     return success;
 }
